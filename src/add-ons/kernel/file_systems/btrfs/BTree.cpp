@@ -209,19 +209,19 @@ BTree::_Find(btrfs_key& key, void** _value, size_t* _size,
 		for (; i < stream->header.ItemCount(); i++) {
 			int32 comp = key.Compare(stream->index[i].key);
 			TRACE("Find() found index %" B_PRIu32 " at %" B_PRId64 " comp %"
-				B_PRId32 "\n", i, stream->index[i].BlockNum(), comp);
+				B_PRId32 "\n", i, stream->index[i].Logical(), comp);
 			if (comp > 0)
 				continue;
 			if (comp < 0 || type == BTREE_BACKWARD)
 				break;
 		}
 		TRACE("Find() getting index %" B_PRIu32 " at %" B_PRId64 "\n", i - 1,
-			stream->index[i - 1].BlockNum());
+			stream->index[i - 1].Logical());
 
-		if (fVolume->FindBlock(stream->index[i - 1].BlockNum(), physical)
+		if (fVolume->FindBlock(stream->index[i - 1].Logical(), physical)
 			!= B_OK) {
 			ERROR("Find() unmapped block %" B_PRId64 "\n",
-				stream->index[i - 1].BlockNum());
+				stream->index[i - 1].Logical());
 			return B_ERROR;
 		}
 		stream = (btrfs_stream*)cached.SetTo(physical);
