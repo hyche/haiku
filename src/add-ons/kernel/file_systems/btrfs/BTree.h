@@ -121,8 +121,8 @@ public:
 									size_t* size = NULL);
 
 			status_t			SetRoot(off_t logical, fsblock_t* block);
-
 			fsblock_t			RootBlock() const { return fRootBlock; }
+			off_t				LogicalRoot() const { return fLogicalRoot; }
 
 private:
 								BTree(const BTree& other);
@@ -137,6 +137,7 @@ private:
 			friend class TreeIterator;
 
 			fsblock_t			fRootBlock;
+			off_t				fLogicalRoot;
 			Volume*				fVolume;
 			mutex				fIteratorLock;
 			SinglyLinkedList<TreeIterator> fIterators;
