@@ -41,11 +41,11 @@ struct node_and_key {
 };
 
 
-class BNode {
+class BTreeNode {
 public:
-								BNode(void* cache);
-								BNode(void* cache, off_t block);
-								~BNode();
+								BTreeNode(void* cache);
+								BTreeNode(void* cache, off_t block);
+								~BTreeNode();
 
 					// just return from Header
 				uint64			Logical() const
@@ -83,8 +83,8 @@ public:
 				int32			SearchSlot(const btrfs_key& key, int* slot,
 									btree_traversing type) const;
 private:
-								BNode(const BNode&);
-								BNode& operator=(const BNode&);
+								BTreeNode(const BTreeNode&);
+								BTreeNode& operator=(const BTreeNode&);
 									//no implementation
 
 			btrfs_stream* 		fNode;
@@ -95,8 +95,13 @@ private:
 };
 
 
-class BPath {
-	BNode* nodes[BTRFS_MAX_TREE_DEPTH];
+class BTreePath {
+public:
+								BTreePath();
+private:
+								BTreePath(const BTreePath&);
+								BTreePath operator=(const BTreePath&);
+			BTreeNode*			nodes[BTRFS_MAX_TREE_DEPTH];
 };
 
 
