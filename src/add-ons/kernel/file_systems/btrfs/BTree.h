@@ -80,8 +80,8 @@ public:
 			off_t				BlockNum() const { return fBlockNumber;}
 			bool				IsWritable() const { return fWritable; }
 
-				int32			SearchSlot(const btrfs_key& key, int* slot,
-									btree_traversing type) const;
+			int32				SearchSlot(const btrfs_key& key, int* slot,
+								btree_traversing type) const;
 private:
 								BTreeNode(const BTreeNode&);
 								BTreeNode& operator=(const BTreeNode&);
@@ -114,11 +114,11 @@ public:
 									fsblock_t rootBlock);
 								~BTree();
 			status_t			FindExact(btrfs_key& key, void** value,
-									size_t* size = NULL);
+									size_t* size = NULL, bool read = true);
 			status_t			FindNext(btrfs_key& key, void** value,
-									size_t* size = NULL);
+									size_t* size = NULL, bool read = true);
 			status_t			FindPrevious(btrfs_key& key, void** value,
-									size_t* size = NULL);
+									size_t* size = NULL, bool read = true);
 
 			Volume*				SystemVolume() const { return fVolume; }
 
@@ -131,8 +131,8 @@ private:
 								BTree& operator=(const BTree& other);
 									// no implementation
 
-			status_t			_Find(btrfs_key& key, void** value,
-									size_t* size, btree_traversing type);
+			status_t			_Find(btrfs_key& key, void** value, size_t* size,
+									bool read, btree_traversing type);
 			void				_AddIterator(TreeIterator* iterator);
 			void				_RemoveIterator(TreeIterator* iterator);
 private:
