@@ -454,7 +454,7 @@ struct btrfs_extent_data_ref {
 #define BTRFS_BLOCKGROUP_FLAG_RAID10		64
 #define BTRFS_BLOCKGROUP_FLAG_RAID5			128
 #define BTRFS_BLOCKGROUP_FLAG_RAID6			256
-#define BTRFS_BLOCKGROUP_FLAG_MASK			512
+#define BTRFS_BLOCKGROUP_FLAG_MASK			511
 
 
 struct file_cookie {
