@@ -21,10 +21,10 @@
 #	define ERROR(x...) dprintf("\33[34mbtrfs:\33[0m " x)
 
 
-BTreeNode::BTreeNode(void* cache)
+BTreeNode::BTreeNode(Volume* volume)
 	:
 	fNode(NULL),
-	fCache(cache),
+	fVolume(volume),
 	fBlockNumber(0),
 	fCurrentSlot(0),
 	fWritable(false)
@@ -32,10 +32,10 @@ BTreeNode::BTreeNode(void* cache)
 }
 
 
-BTreeNode::BTreeNode(void* cache, off_t block)
+BTreeNode::BTreeNode(Volume* volume, off_t block)
 	:
 	fNode(NULL),
-	fCache(cache),
+	fVolume(volume),
 	fBlockNumber(0),
 	fCurrentSlot(0),
 	fWritable(false)
@@ -60,7 +60,7 @@ void
 BTreeNode::Unset()
 {
 	if (fNode != NULL) {
-		block_cache_put(fCache, fBlockNumber);
+		block_cache_put(fVolume->BlockCache(), fBlockNumber);
 		fNode = NULL;
 	}
 }
@@ -71,7 +71,7 @@ BTreeNode::SetTo(off_t block)
 {
 	Unset();
 	fBlockNumber = block;
-	fNode = (btrfs_stream*)block_cache_get(fCache, block);
+	fNode = (btrfs_stream*)block_cache_get(fVolume->BlockCache(), block);
 }
 
 
@@ -82,10 +82,10 @@ BTreeNode::SetToWritable(off_t block, int32 transactionId, bool empty)
 	fBlockNumber = block;
 	fWritable = true;
 	if (empty) {
-		fNode = (btrfs_stream*)block_cache_get_empty(fCache, block,
+		fNode = (btrfs_stream*)block_cache_get_empty(fVolume->BlockCache(), block,
 			transactionId);
 	} else {
-		fNode = (btrfs_stream*)block_cache_get_writable(fCache, block,
+		fNode = (btrfs_stream*)block_cache_get_writable(fVolume->BlockCache(), block,
 			transactionId);
 	}
 }
@@ -209,7 +209,7 @@ BTree::_Find(btrfs_key& key, void** _value, size_t* _size,
 	TRACE("Find() objectid %" B_PRId64 " type %d offset %" B_PRId64 " \n",
 		key.ObjectID(),	key.Type(), key.Offset());
 	CachedBlock cached(fVolume);
-	BTreeNode node(fVolume->BlockCache(), fRootBlock);
+	BTreeNode node(fVolume, fRootBlock);
 	int slot, ret;
 	fsblock_t physicalBlock;
 

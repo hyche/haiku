@@ -220,9 +220,9 @@ BlockGroup::_InsertFreeExtent(FreeExtentTree* tree, uint64 start, uint64 length,
 
 ExtentAllocator::ExtentAllocator(Volume* volume)
 	:
-	fTree(NULL),
+	fVolume(volume),
 	fBlockGroup(NULL),
-	fVolume(volume)
+	fTree(NULL)
 {
 	fTree = new FreeExtentTree(TreeDefinition());
 	fBlockGroup = new BlockGroup(volume->ExtentTree());

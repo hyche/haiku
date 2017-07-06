@@ -43,8 +43,8 @@ struct node_and_key {
 
 class BTreeNode {
 public:
-								BTreeNode(void* cache);
-								BTreeNode(void* cache, off_t block);
+								BTreeNode(Volume* volume);
+								BTreeNode(Volume* volume, off_t block);
 								~BTreeNode();
 
 				// just return from Header
@@ -88,7 +88,7 @@ private:
 									//no implementation
 
 			btrfs_stream* 		fNode;
-			void* 				fCache;
+			Volume*				fVolume;
 			off_t				fBlockNumber;
 			uint32 				fCurrentSlot;
 			bool				fWritable;
