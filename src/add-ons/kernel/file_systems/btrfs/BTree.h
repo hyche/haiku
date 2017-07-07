@@ -80,12 +80,18 @@ public:
 			off_t				BlockNum() const { return fBlockNumber;}
 			bool				IsWritable() const { return fWritable; }
 
+			uint32				SpaceUsed() const;
+			uint32				SpaceLeft() const;
+
 			int32				SearchSlot(const btrfs_key& key, int* slot,
 								btree_traversing type) const;
 private:
 								BTreeNode(const BTreeNode&);
 								BTreeNode& operator=(const BTreeNode&);
 									//no implementation
+
+			uint32				_CalculateSpace(uint32 from, uint32 to,
+									uint8 type) const;
 
 			btrfs_stream* 		fNode;
 			Volume*				fVolume;

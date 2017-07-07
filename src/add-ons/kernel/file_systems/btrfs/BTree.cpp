@@ -91,6 +91,48 @@ BTreeNode::SetToWritable(off_t block, int32 transactionId, bool empty)
 }
 
 
+//calculate used space, 0 is for internal node, from 1 -> 3 is for leaf
+//type 0: calculate for internal nodes
+//type 1: only item space
+//type 2: only item data space
+//type 3: both type 1 and 2
+uint32
+BTreeNode::_CalculateSpace(uint32 from, uint32 to, uint8 type) const
+{
+	if (to < from || from < 0 || to >= ItemCount() || ItemCount() == 0)
+		return 0;
+
+	uint32 result = 0;
+	if (type == 0) {
+		result = sizeof(btrfs_index) * (to - from + 1);
+	}
+	if ((type & 1) == 1) {
+		result += sizeof(btrfs_entry) * (to - from + 1);
+	}
+	if ((type & 2) == 2) {
+		result += Item(from)->Offset() + Item(from)->Size()
+			- Item(to)->Offset();
+	}
+	return result + sizeof(btrfs_header);
+}
+
+
+uint32
+BTreeNode::SpaceUsed() const
+{
+	if (Level() == 0)
+		return _CalculateSpace(0, ItemCount() - 1, 3);
+	return _CalculateSpace(0, ItemCount() - 1, 0);
+}
+
+
+uint32
+BTreeNode::SpaceLeft() const
+{
+	return fVolume->BlockSize() - SpaceUsed();
+}
+
+
 int32
 BTreeNode::SearchSlot(const btrfs_key& key, int* slot, btree_traversing type) const
 {
