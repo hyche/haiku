@@ -109,6 +109,13 @@ struct btrfs_header {
 	uint32 ItemCount() const
 		{ return B_LENDIAN_TO_HOST_INT32(item_count); }
 	uint8 Level() const { return level; }
+	void SetLogical(uint64 logical)
+		{ logical_address = B_HOST_TO_LENDIAN_INT64(logical); }
+	void SetFlags(uint64 flags) { flags = B_HOST_TO_LENDIAN_INT64(flags); }
+	void SetGeneration(uint64 gen) { generation = B_HOST_TO_LENDIAN_INT64(gen);}
+	void SetOwner(uint64) { owner = B_HOST_TO_LENDIAN_INT64(owner); }
+	void SetItemCount(uint32 itemCount)
+		{ item_count = B_HOST_TO_LENDIAN_INT32(itemCount); }
 } _PACKED;
 
 
