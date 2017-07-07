@@ -91,11 +91,13 @@ BTreeNode::SetToWritable(off_t block, int32 transactionId, bool empty)
 }
 
 
-//calculate used space, 0 is for internal node, from 1 -> 3 is for leaf
-//type 0: calculate for internal nodes
-//type 1: only item space
-//type 2: only item data space
-//type 3: both type 1 and 2
+/*
+ * calculate used space, 0 is for internal node, from 1 -> 3 is for leaf
+ * type 0: calculate for internal nodes
+ * type 1: only item space
+ * type 2: only item data space
+ * type 3: both type 1 and 2
+ */
 uint32
 BTreeNode::_CalculateSpace(uint32 from, uint32 to, uint8 type) const
 {
@@ -130,6 +132,52 @@ uint32
 BTreeNode::SpaceLeft() const
 {
 	return fVolume->BlockSize() - SpaceUsed();
+}
+
+
+void
+BTreeNode::_Copy(const BTreeNode* origin, uint32 at, uint32 from,
+	uint32 to) const
+{
+	if (Level() == 0) {
+		memcpy(Item(at), origin->Item(from),
+			origin->_CalculateSpace(from, to, 1));
+		memcpy(ItemData(at), origin->ItemData(from),
+			origin->_CalculateSpace(from, to, 2));
+	} else {
+		memcpy(Index(at), origin->Index(from),
+			origin->_CalculateSpace(from, to, 0));
+	}
+}
+
+
+/*
+ * copy item and item data except its header
+ * length < 0: removing
+ * length > 0: inserting
+ */
+status_t
+BTreeNode::Copy(const BTreeNode* origin, uint32 start, uint32 end,
+	int length) const
+{
+	if (length < 0 && std::abs(length) >= SpaceUsed() - sizeof(btrfs_header)
+		|| (length > 0 && length >= SpaceLeft()))
+		return B_BAD_VALUE;
+
+	if (length == 0) {
+		//copy all
+		_Copy(origin, 0, 0, ItemCount() - 1);
+	} else if (length < 0) {
+		//removing all items in [start, end]
+		_Copy(origin, 0, 0, start - 1);	// <-- [start,...
+		_Copy(origin, start, end + 1, ItemCount() - 1);	// ..., end] -->
+	} else {
+		//inserting in [start, end] - make a hole for later
+		_Copy(origin, 0, 0, start - 1);
+		_Copy(origin, end + 1, start, ItemCount() - 1);
+	}
+
+	return B_OK;
 }
 
 

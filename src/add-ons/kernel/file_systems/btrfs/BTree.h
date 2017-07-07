@@ -83,6 +83,8 @@ public:
 			uint32				SpaceUsed() const;
 			uint32				SpaceLeft() const;
 
+			status_t			Copy(const BTreeNode* origin, uint32 start,
+									uint32 end, int length) const;
 			int32				SearchSlot(const btrfs_key& key, int* slot,
 								btree_traversing type) const;
 private:
@@ -90,6 +92,8 @@ private:
 								BTreeNode& operator=(const BTreeNode&);
 									//no implementation
 
+			void				_Copy(const BTreeNode* origin, uint32 at, uint32 from,
+									uint32 to) const;
 			uint32				_CalculateSpace(uint32 from, uint32 to,
 									uint8 type) const;
 
