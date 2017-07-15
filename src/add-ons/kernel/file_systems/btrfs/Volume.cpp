@@ -519,4 +519,3 @@ Volume::Identify(int fd, btrfs_super_block* superBlock)
 
 	return B_OK;
 }
-

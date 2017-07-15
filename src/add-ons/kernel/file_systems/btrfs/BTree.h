@@ -3,8 +3,8 @@
  * Copyright 2001-2010, Axel Dörfler, axeld@pinc-software.de.
  * This file may be used under the terms of the MIT License.
  */
-#ifndef B_PLUS_TREE_H
-#define B_PLUS_TREE_H
+#ifndef B_TREE_H
+#define B_TREE_H
 
 
 #include "btrfs.h"
@@ -49,29 +49,28 @@ public:
 
 				// just return from Header
 			uint64				Logical() const
-				{ return fNode->header.Logical(); }
+									{ return fNode->header.Logical(); }
 			uint64				Flags() const
-				{ return fNode->header.Flags(); }
+									{ return fNode->header.Flags(); }
 			uint64				Generation() const
-				{ return fNode->header.Generation(); }
+									{ return fNode->header.Generation(); }
 			uint64				Owner() const
-				{ return fNode->header.Owner(); }
+									{ return fNode->header.Owner(); }
 			uint32				ItemCount() const
-				{ return fNode->header.ItemCount(); }
+									{ return fNode->header.ItemCount(); }
 			uint8				Level() const
-				{ return fNode->header.Level(); }
+									{ return fNode->header.Level(); }
 
 			btrfs_index*		Index(uint32 i) const
-					{ return &fNode->index[i]; }
+									{ return &fNode->index[i]; }
 
 			btrfs_entry*		Item(uint32 i) const
-				{ return &fNode->entries[i]; }
+									{ return &fNode->entries[i]; }
 			uint8*				ItemData(uint32 i) const
-				{ return (uint8*)Item(0) + Item(i)->Offset(); }
+									{ return (uint8*)Item(0) + Item(i)->Offset(); }
 
 			void				Keep();
 			void				Unset();
-
 
 			void				SetTo(off_t block);
 			void				SetToWritable(off_t block,
@@ -86,7 +85,7 @@ public:
 			status_t			Copy(const BTreeNode* origin, uint32 start,
 									uint32 end, int length) const;
 			int32				SearchSlot(const btrfs_key& key, int* slot,
-								btree_traversing type) const;
+									btree_traversing type) const;
 private:
 								BTreeNode(const BTreeNode&);
 								BTreeNode& operator=(const BTreeNode&);
@@ -97,7 +96,8 @@ private:
 			uint32				_CalculateSpace(uint32 from, uint32 to,
 									uint8 type) const;
 
-			btrfs_stream* 		fNode;
+private:
+			btrfs_stream*		fNode;
 			Volume*				fVolume;
 			off_t				fBlockNumber;
 			uint32 				fCurrentSlot;
@@ -212,4 +212,4 @@ TreeIterator::GetPreviousEntry(btrfs_key& key, void** value,
 }
 
 
-#endif	// B_PLUS_TREE_H
+#endif	// B_TREE_H

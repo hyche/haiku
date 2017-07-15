@@ -237,7 +237,7 @@ ExtentAllocator::~ExtentAllocator()
 
 
 void
-ExtentAllocator::AllocateFreeExtent()
+ExtentAllocator::_LoadFreeExtent()
 {
 	BTree* extentTree = new BTree(fVolume);
 	fBlockGroup->LoadExtent(fTree, true);

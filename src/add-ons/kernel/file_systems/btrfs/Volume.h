@@ -38,9 +38,9 @@ public:
 									{ return fFSVolume ? fFSVolume->id : -1; }
 			fs_volume*			FSVolume() const { return fFSVolume; }
 			const char*			Name() const;
-			BTree*			FSTree() const { return fFSTree; }
-			BTree*			ExtentTree() const { return fExtentTree; }
-			BTree*			RootTree() const { return fRootTree; }
+			BTree*				FSTree() const { return fFSTree; }
+			BTree*				ExtentTree() const { return fExtentTree; }
+			BTree*				RootTree() const { return fRootTree; }
 
 			uint32				SectorSize() const { return fSectorSize; }
 			uint32				BlockSize() const { return fBlockSize; }

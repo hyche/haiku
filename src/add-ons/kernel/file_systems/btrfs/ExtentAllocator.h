@@ -29,7 +29,7 @@ public:
 									bool inverse=false);
 			uint64				Start() const { return fKey.ObjectID(); }
 			uint64				End() const
-				{ return fKey.ObjectID() + fKey.Offset(); }
+									{ return fKey.ObjectID() + fKey.Offset(); }
 
 private:
 								BlockGroup(const BlockGroup&);
@@ -37,8 +37,9 @@ private:
 			status_t			_InsertFreeExtent(FreeExtentTree* tree,
 									uint64 size, uint64 length, uint64 flags);
 
+private:
 			btrfs_key			fKey;
-			btrfs_block_group* 	fBlockGroup;
+			btrfs_block_group*	fBlockGroup;
 			BTree*				fExtentTree;
 };
 
@@ -48,10 +49,10 @@ public:
 								ExtentAllocator(Volume* volume);
 								~ExtentAllocator();
 
-			void				AllocateFreeExtent();
 private:
 								ExtentAllocator(const ExtentAllocator&);
 								ExtentAllocator& operator=(const ExtentAllocator&);
+			void				_LoadFreeExtent();
 private:
 			Volume*				fVolume;
 			BlockGroup*			fBlockGroup;

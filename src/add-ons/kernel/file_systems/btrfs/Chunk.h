@@ -28,4 +28,5 @@ private:
 			status_t			fInitStatus;
 };
 
+
 #endif	// CHUNK_H
