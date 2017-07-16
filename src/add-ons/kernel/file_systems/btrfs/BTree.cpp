@@ -93,7 +93,8 @@ BTreeNode::SetToWritable(off_t block, int32 transactionId, bool empty)
 
 
 /*
- * calculate used space, 0 is for internal node, from 1 -> 3 is for leaf
+ * calculate used space except the header,
+ * 0 is for internal node, from 1 -> 3 is for leaf
  * type 0: calculate for internal nodes
  * type 1: only item space
  * type 2: only item data space
@@ -102,9 +103,6 @@ BTreeNode::SetToWritable(off_t block, int32 transactionId, bool empty)
 uint32
 BTreeNode::_CalculateSpace(uint32 from, uint32 to, uint8 type) const
 {
-	if (to < from || from < 0 || to >= ItemCount() || ItemCount() == 0)
-		return 0;
-
 	uint32 result = 0;
 	if (type == 0) {
 		result = sizeof(btrfs_index) * (to - from + 1);
@@ -116,7 +114,7 @@ BTreeNode::_CalculateSpace(uint32 from, uint32 to, uint8 type) const
 		result += Item(from)->Offset() + Item(from)->Size()
 			- Item(to)->Offset();
 	}
-	return result + sizeof(btrfs_header);
+	return result;
 }
 
 
@@ -124,8 +122,8 @@ uint32
 BTreeNode::SpaceUsed() const
 {
 	if (Level() == 0)
-		return _CalculateSpace(0, ItemCount() - 1, 3);
-	return _CalculateSpace(0, ItemCount() - 1, 0);
+		return _CalculateSpace(0, ItemCount() - 1, 3) + sizeof(btrfs_header);
+	return _CalculateSpace(0, ItemCount() - 1, 0) + sizeof(btrfs_header);
 }
 
 
