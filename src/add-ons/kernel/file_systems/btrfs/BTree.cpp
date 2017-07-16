@@ -136,12 +136,22 @@ BTreeNode::SpaceLeft() const
 
 void
 BTreeNode::_Copy(const BTreeNode* origin, uint32 at, uint32 from,
-	uint32 to) const
+	uint32 to, int length) const
 {
+	TRACE("BTreeNode::_Copy() at: %d from: %d to: %d length: %d\n",
+		at, from, to, length);
 	if (Level() == 0) {
 		memcpy(Item(at), origin->Item(from),
 			origin->_CalculateSpace(from, to, 1));
-		memcpy(ItemData(at), origin->ItemData(from),
+
+		// Item offset of copied node must be changed to get the
+		// item data offset correctly. length can be zero
+		// but let it there doesn't harm anything.
+		for (int i = at; i - at <= to - from; ++i) {
+			Item(i)->SetOffset(Item(i)->Offset() - length);
+			TRACE("BTreeNode::_Copy() i: %d offset %d\n", i, Item(i)->Offset());
+		}
+		memcpy(ItemData(at + to - from), origin->ItemData(to),
 			origin->_CalculateSpace(from, to, 2));
 	} else {
 		memcpy(Index(at), origin->Index(from),
@@ -159,21 +169,34 @@ status_t
 BTreeNode::Copy(const BTreeNode* origin, uint32 start, uint32 end,
 	int length) const
 {
-	if (length < 0 && std::abs(length) >= SpaceUsed() - sizeof(btrfs_header)
-		|| (length > 0 && length >= SpaceLeft()))
+	if (length < 0
+			&& std::abs(length) >= origin->SpaceUsed() - sizeof(btrfs_header)
+		|| (length > 0 && length >= origin->SpaceLeft()))
 		return B_BAD_VALUE;
 
+	TRACE("BTreeNode::Copy() start %d end %d length %d\n", start,
+		end, length);
 	if (length == 0) {
-		//copy all
-		_Copy(origin, 0, 0, ItemCount() - 1);
+		_Copy(origin, 0, 0, origin->ItemCount() - 1, 0);
 	} else if (length < 0) {
 		//removing all items in [start, end]
-		_Copy(origin, 0, 0, start - 1);	// <-- [start,...
-		_Copy(origin, start, end + 1, ItemCount() - 1);	// ..., end] -->
+		if (start > 0)
+			_Copy(origin, 0, 0, start - 1, 0);	// <-- [start,...
+		if (end + 1 < origin->ItemCount()) {
+			// we only care data size
+			length += sizeof(btrfs_entry) * (end - start + 1);
+			// ..., end] -->
+			_Copy(origin, start, end + 1, origin->ItemCount() - 1, length);
+		}
 	} else {
 		//inserting in [start, end] - make a hole for later
-		_Copy(origin, 0, 0, start - 1);
-		_Copy(origin, end + 1, start, ItemCount() - 1);
+		if (start > 0)
+			_Copy(origin, 0, 0, start - 1, 0);
+		if (start < origin->ItemCount()) {
+			// again we care data size only
+			length -= sizeof(btrfs_entry) * (end - start + 1);
+			_Copy(origin, end + 1, start, origin->ItemCount() - 1, length);
+		}
 	}
 
 	return B_OK;

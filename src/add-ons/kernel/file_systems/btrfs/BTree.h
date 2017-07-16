@@ -91,8 +91,8 @@ private:
 								BTreeNode& operator=(const BTreeNode&);
 									//no implementation
 
-			void				_Copy(const BTreeNode* origin, uint32 at, uint32 from,
-									uint32 to) const;
+			void				_Copy(const BTreeNode* origin, uint32 at,
+									uint32 from, uint32 to, int length) const;
 			uint32				_CalculateSpace(uint32 from, uint32 to,
 									uint8 type) const;
 
