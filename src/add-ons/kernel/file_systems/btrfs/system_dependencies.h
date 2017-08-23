@@ -33,6 +33,7 @@
 #include <SupportDefs.h>
 #include <lock.h>
 #include <errno.h>
+#include <algorithm>
 #include <new>
 #include <dirent.h>
 #include <string.h>
