@@ -240,9 +240,6 @@ Volume::Name() const
 status_t
 Volume::Mount(const char* deviceName, uint32 flags)
 {
-	flags |= B_MOUNT_READ_ONLY;
-		// we only support read-only for now
-
 	if ((flags & B_MOUNT_READ_ONLY) != 0) {
 		TRACE("Volume::Mount(): Read only\n");
 	} else {
@@ -476,7 +473,8 @@ Volume::Unmount()
 	TRACE("Volume::Unmount(): Putting root node\n");
 	put_vnode(fFSVolume, RootNode()->ID());
 	TRACE("Volume::Unmount(): Deleting the block cache\n");
-	block_cache_delete(fBlockCache, !IsReadOnly());
+	//block_cache_delete(fBlockCache, !IsReadOnly());
+	block_cache_delete(fBlockCache, false);
 	TRACE("Volume::Unmount(): Closing device\n");
 	close(fDevice);
 
