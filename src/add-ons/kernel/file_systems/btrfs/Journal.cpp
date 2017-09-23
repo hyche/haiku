@@ -35,9 +35,22 @@ Journal::~Journal()
 
 
 /*static*/ void
+Journal::_TransactionEnded(int32 transactionID, int32 event, void* _journal)
+{
+	TRACE("TRANSACTION ENDED id %i\n", transactionID);
+}
+
+
+/*static*/ void
 Journal::_TransactionWritten(int32 transactionID, int32 event, void* _journal)
 {
+	// increase transactionID of system
 	TRACE("TRANSACTION WRITTEN id %i\n", transactionID);
+	Journal* journal = (Journal*)_journal;
+
+	//update superblock
+	btrfs_super_block& superBlock = journal->GetVolume()->SuperBlock();
+
 }
 
 
@@ -45,7 +58,13 @@ status_t
 Journal::_TransactionDone(bool success)
 {
 	if (!success) {
+		//if (fHasSubTransaction == true) {
+		//	cache_abort_sub_transaction(fVolume->BlockCache(), fTransactionID);
+		// We can continue to use the parent transaction afterwards
+		//} else {
 		cache_abort_transaction(fVolume->BlockCache(), fTransactionID);
+		//	fUnwrittenTransactions = 0;
+		//}
 		return B_OK;
 	}
 	cache_end_transaction(fVolume->BlockCache(), fTransactionID,
@@ -66,6 +85,8 @@ Journal::Lock(Transaction* owner)
 		return B_OK;
 	}
 
+	//if (separateSubTransactions == true)
+	//	fSeparateSubTransactions = true;
 
 	if (owner != NULL)
 		owner->SetParent(fOwner);
@@ -73,6 +94,12 @@ Journal::Lock(Transaction* owner)
 	fOwner = owner;
 
 	if (fOwner != NULL) {
+		//if (fUnwrittenTransactions > 0) {
+			// start a sub transaction
+		//	kprintf("start sub %i\n", fUnwrittenTransactions);
+		//	cache_start_sub_transaction(fVolume->BlockCache(), fTransactionID);
+		//	fHasSubTransaction = true;
+		//} else
 		fTransactionID = cache_start_transaction(fVolume->BlockCache());
 
 		if (fTransactionID < B_OK) {
@@ -81,6 +108,9 @@ Journal::Lock(Transaction* owner)
 		}
 		fCurrentGeneration++;
 		TRACE("Journal::Lock() start transaction id: %i\n", fTransactionID);
+
+		//cache_add_transaction_listener(fVolume->BlockCache(), fTransactionID,
+		//	TRANSACTION_ENDED, &_TransactionEnded, this);
 	}
 
 	return B_OK;
@@ -112,6 +142,7 @@ Transaction::Transaction(Volume* volume)
 	:
 	fJournal(NULL),
 	fParent(NULL)
+	//fListeners(NULL),
 {
 	Start(volume);
 }
@@ -138,6 +169,13 @@ Transaction::HasBlock(fsblock_t blockNumber) const
 {
 	return cache_has_block_in_transaction(fJournal->GetVolume()->BlockCache(),
 		ID(), blockNumber);
+}
+
+
+void
+Transaction::InsertBlock(fsblock_t blockNumber)
+{
+	//fBlocksTable.insert(blockNumber);
 }
 
 

@@ -9,6 +9,7 @@
 
 
 #include "Chunk.h"
+#include "BTree.h"
 
 
 //#define TRACE_BTRFS
@@ -74,7 +75,67 @@ Chunk::FindBlock(off_t logical, off_t& physical)
 		return B_BAD_VALUE;
 
 	// only one stripe
+	TRACE("Chunk::FindBlock() logical: %" B_PRIdOFF " stripe offset:%"
+		B_PRIu64 " chunk offset: %" B_PRIu64 "\n", logical, fChunk->stripes[0].Offset(), fChunkOffset);
 	physical = logical + fChunk->stripes[0].Offset() - fChunkOffset;
 	return B_OK;
 }
 
+
+// DevExtent
+
+
+DevExtent::DevExtent(Volume* volume)
+	:
+	fVolume(volume)
+{
+}
+
+
+DevExtent::DevExtent(Volume* volume, off_t physical)
+	:
+	fVolume(volume)
+{
+}
+
+
+DevExtent::~DevExtent()
+{
+	delete fDevExtent;
+}
+
+
+uint64
+DevExtent::End() const
+{
+	if (Offset() == 0)
+		return 0;
+	return Offset() + fDevExtent->Length();
+}
+
+
+// Allocate DevExtent contains physical address "physical".
+void
+DevExtent::Init(off_t physical)
+{
+	fKey.SetObjectID(fVolume->ID());
+	fKey.SetType(BTRFS_KEY_TYPE_DEVICE_EXTENT);
+	fKey.SetOffset(physical);
+	//if (fVolume->DevTree()->FindPrevious(fKey, (void**)&fDevExtent) != B_OK){
+	//	TRACE("DevExtent::Init() not found dev extent offset: %" B_PRIu64 "\n",
+	//		physical);
+	//}
+}
+
+
+off_t
+DevExtent::ToLogical(off_t physical)
+{
+	if (Offset() == 0)	// logical address is the same as physical address
+		return physical;
+
+	if (physical >= End() || physical < Offset())
+		Init(physical);
+
+	return physical - Offset() + fDevExtent->ChunkOffset();
+}

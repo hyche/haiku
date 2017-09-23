@@ -9,13 +9,13 @@
 
 
 #include "btrfs.h"
+#include "BTree.h"
 
 
 enum volume_flags {
 	VOLUME_READ_ONLY	= 0x0001
 };
 
-class BTree;
 class Chunk;
 class Inode;
 class Journal;
@@ -43,6 +43,7 @@ public:
 			fs_volume*			FSVolume() const { return fFSVolume; }
 			const char*			Name() const;
 			BTree*				FSTree() const { return fFSTree; }
+			BTree*				DevTree() const { return fDevTree; }
 			BTree*				ExtentTree() const { return fExtentTree; }
 			BTree*				RootTree() const { return fRootTree; }
 
@@ -74,6 +75,7 @@ private:
 			mutex				fLock;
 			fs_volume*			fFSVolume;
 			int					fDevice;
+			int					fOldestBackup;
 			ino_t				fLargestInodeID;
 			btrfs_super_block	fSuperBlock;
 			char				fName[32];

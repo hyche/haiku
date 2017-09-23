@@ -21,4 +21,5 @@ KernelAddon btrfs :
 	Journal.cpp
 	Volume.cpp
 	: kernel_libz.a
+	shared [ TargetLibsupc++ ] [ TargetLibstdc++ ]
 ;

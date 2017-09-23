@@ -30,7 +30,8 @@ Inode::Inode(Volume* volume, ino_t id)
 	fVolume(volume),
 	fID(id),
 	fCache(NULL),
-	fMap(NULL)
+	fMap(NULL),
+	fNumReferences(0)
 {
 	rw_lock_init(&fLock, "btrfs inode");
 
@@ -52,6 +53,7 @@ Inode::Inode(Volume* volume, ino_t id, const btrfs_inode& item)
 	fMap(NULL),
 	fInitStatus(B_OK),
 	fNode(item)
+	//fNumReferences(0)
 {
 	if (!IsDirectory() && !IsSymLink()) {
 		fCache = file_cache_create(fVolume->ID(), ID(), Size());
@@ -66,7 +68,8 @@ Inode::Inode(Volume* volume)
 	fID(0),
 	fCache(NULL),
 	fMap(NULL),
-	fInitStatus(B_NO_INIT)
+	fInitStatus(B_NO_INIT),
+	fNumReferences(0)
 {
 	rw_lock_init(&fLock, "btrfs inode");
 }
@@ -74,7 +77,7 @@ Inode::Inode(Volume* volume)
 
 Inode::~Inode()
 {
-	TRACE("Inode destructor\n");
+	TRACE("Inode destructor id %" B_PRIdINO "\n", fID);
 	file_cache_delete(FileCache());
 	file_map_delete(Map());
 	TRACE("Inode destructor: Done\n");
@@ -222,7 +225,8 @@ Inode::ReadAt(off_t pos, uint8* buffer, size_t* _length)
 		*_length = 0;
 		return B_NO_ERROR;
 	}
-
+	kprintf("ReadAt(): inode info id: %i, pos: %i, length:%i\n",
+		ID(), pos, *_length);
 	// the file cache doesn't seem to like non block aligned file offset
 	// so we avoid the file cache for inline extents
 	btrfs_key search_key;
@@ -350,7 +354,7 @@ Inode::ReadAt(off_t pos, uint8* buffer, size_t* _length)
 
 
 status_t
-Inode::FindParent(ino_t* id)
+Inode::FindReference(btrfs_inode_ref** _nodeRef, ino_t* _parentID)
 {
 	btrfs_key search_key;
 	search_key.SetType(BTRFS_KEY_TYPE_INODE_REF);
@@ -358,17 +362,18 @@ Inode::FindParent(ino_t* id)
 	search_key.SetOffset(-1);
 	BTree::Path path(fVolume->FSTree());
 
-	void* node_ref;
-	if (fVolume->FSTree()->FindPrevious(&path, search_key, &node_ref) != B_OK) {
-		ERROR("Inode::FindParent(): Couldn't find inode for %" B_PRIdINO "\n",
+	status_t status = fVolume->FSTree()->FindPrevious(&path, search_key,
+		(void**)_nodeRef);
+	if (status != B_OK) {
+		ERROR("Inode::FindReference(): Couldn't find inode for %" B_PRIdINO "\n",
 			fID);
-		return B_ERROR;
+		return status;
 	}
 
-	free(node_ref);
-	*id = search_key.Offset();
-	TRACE("Inode::FindParent() for %" B_PRIdINO ": %" B_PRIdINO "\n", fID,
-		*id);
+	TRACE("Inode::FindReference() parent id for %" B_PRIdINO ": %" B_PRIu64 "\n",
+		fID, search_key.Offset());
+	if (_parentID != NULL)
+		*_parentID = search_key.Offset();
 
 	return B_OK;
 }
@@ -489,6 +494,7 @@ Inode::MakeReference(Transaction& transaction, BTree::Path* path,
 	if (status != B_OK)
 		return status;
 
+	fNumReferences++;
 	return B_OK;
 }
 

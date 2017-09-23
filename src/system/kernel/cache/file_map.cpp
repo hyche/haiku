@@ -233,7 +233,7 @@ status_t
 FileMap::_Add(file_io_vec* vecs, size_t vecCount, off_t& lastOffset)
 {
 	TRACE("FileMap@%p::Add(vecCount = %ld)\n", this, vecCount);
-
+	kprintf("FILEMAP::_ADD() vecCount: %d\n", vecCount);
 	uint32 start = fCount;
 	off_t offset = 0;
 
@@ -372,6 +372,7 @@ FileMap::_Cache(off_t offset, off_t size)
 		status = vfs_get_file_map(Vnode(), mapEnd, ~0UL, vecs, &vecCount);
 		if (status == B_OK || status == B_BUFFER_OVERFLOW)
 			status = _Add(vecs, vecCount, mapEnd);
+		kprintf("FILEMAP::_CACHE() mapEnd: %d\n", mapEnd);
 	}
 
 	return status;
@@ -431,6 +432,7 @@ FileMap::Translate(off_t offset, size_t size, file_io_vec* vecs, size_t* _count,
 	// First, we need to make sure that we have already cached all file
 	// extents needed for this request.
 
+	kprintf("FILEMAP::TRANSLATE() align: %d offset: %d size: %d\n", align, offset, size);
 	status_t status = _Cache(offset, size);
 	if (status != B_OK)
 		return status;

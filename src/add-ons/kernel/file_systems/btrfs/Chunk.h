@@ -11,6 +11,7 @@
 
 
 #include "btrfs.h"
+#include "Volume.h"
 
 
 class Chunk {
@@ -28,5 +29,24 @@ private:
 			fsblock_t			fChunkOffset;
 			status_t			fInitStatus;
 };
+
+
+class DevExtent {
+public:
+								DevExtent(Volume* volume);
+								DevExtent(Volume* volume, off_t physical);
+								~DevExtent();
+			uint64				Offset() const { return fKey.Offset(); }
+			uint64				End() const;
+			void				Init(off_t physical);
+			off_t				ToLogical(off_t physical);
+
+
+private:
+			Volume*				fVolume;
+			btrfs_dev_extent*	fDevExtent;
+			btrfs_key			fKey;
+};
+
 
 #endif	// CHUNK_H

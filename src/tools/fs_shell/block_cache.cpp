@@ -26,7 +26,7 @@
 // TODO: the retrieval/copy of the original data could be delayed until the
 //		new data must be written, ie. in low memory situations.
 
-//#define TRACE_BLOCK_CACHE
+#define TRACE_BLOCK_CACHE
 #ifdef TRACE_BLOCK_CACHE
 #	define TRACE(x)	fssh_dprintf x
 #else
@@ -312,6 +312,7 @@ static void
 notify_transaction_listeners(block_cache* cache, cache_transaction* transaction,
 	int32_t event)
 {
+	TRACE(("notify_transaction_listener: event %i\n", event));
 	bool isClosing = is_closing_event(event);
 	bool isWritten = is_written_event(event);
 
@@ -1651,7 +1652,7 @@ fssh_block_cache_get_writable_etc(void* _cache, fssh_off_t blockNumber, fssh_off
 {
 	block_cache* cache = (block_cache*)_cache;
 	MutexLocker locker(&cache->lock);
-
+	
 	TRACE(("block_cache_get_writable_etc(block = %Ld, transaction = %ld)\n",
 		blockNumber, transaction));
 	if (cache->read_only)
@@ -1676,6 +1677,7 @@ fssh_block_cache_get_empty(void* _cache, fssh_off_t blockNumber,
 	int32_t transaction)
 {
 	block_cache* cache = (block_cache*)_cache;
+	fssh_kprintf("fssh_block_cache_get_empty() Enter cache: %p mutex: %p\n", cache, &cache->lock);
 	MutexLocker locker(&cache->lock);
 
 	TRACE(("block_cache_get_empty(block = %Ld, transaction = %ld)\n",

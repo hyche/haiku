@@ -1168,6 +1168,7 @@ BlockWriter::Add(cache_transaction* transaction, bool& hasLeftOvers)
 status_t
 BlockWriter::Write(cache_transaction* transaction, bool canUnlock)
 {
+	TRACE(("BlockWriter::Write\n"));
 	if (fCount == 0)
 		return B_OK;
 
@@ -2749,6 +2750,7 @@ cache_sync_transaction(void* _cache, int32 id)
 	bool hadBusy;
 
 	TRACE(("cache_sync_transaction(id %" B_PRId32 ")\n", id));
+	TRACE(("????\n"));
 
 	do {
 		TransactionLocker locker(cache);
@@ -2781,10 +2783,12 @@ cache_sync_transaction(void* _cache, int32 id)
 		}
 
 		status_t status = writer.Write();
+		TRACE(("????\n"));
 		if (status != B_OK)
 			return status;
 	} while (hadBusy);
 
+	TRACE("WAIT FOR NOTIFICATION\n");
 	wait_for_notifications(cache);
 		// make sure that all pending TRANSACTION_WRITTEN notifications
 		// are handled after we return

@@ -34,6 +34,7 @@ struct CachedExtent : AVLTreeNode {
 			uint64				End() const { return offset + length; }
 			bool				IsAllocated() const;
 			bool				IsData() const;
+			//bool				IsValid() const;
 
 			void				Info() const;
 
@@ -100,7 +101,9 @@ private:
 
 class BlockGroup {
 public:
+								//BlockGroup();
 								BlockGroup(BTree* extentTree);
+								//BlockGroup(BTree* extentTree, uint64 flag);
 								~BlockGroup();
 
 			status_t			SetExtentTree(off_t rootAddress);

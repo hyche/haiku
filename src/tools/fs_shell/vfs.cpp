@@ -3290,14 +3290,15 @@ dir_create(int fd, char *path, int perms, bool kernel)
 
 	FUNCTION(("dir_create: path '%s', perms %d, kernel %d\n", path, perms, kernel));
 
+	fssh_kprintf("dir_create: path '%s', perms %d, kernel %d\n", path, perms, kernel);
 	status = fd_and_path_to_dir_vnode(fd, path, &vnode, filename, kernel);
 	if (status < 0)
 		return status;
-
 	if (HAS_FS_CALL(vnode, create_dir))
 		status = FS_CALL(vnode, create_dir, filename, perms);
 	else
 		status = FSSH_EROFS;
+	fssh_kprintf("dir_create: OK %s\n", fssh_strerror(status));
 
 	put_vnode(vnode);
 	return status;

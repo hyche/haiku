@@ -61,7 +61,7 @@ CachedExtent::Info() const
 	else if (IsAllocated() == true && IsData() == true)
 		extentType = "allocated data extent";
 
-	TRACE("%s at %" B_PRIu64 " length %" B_PRIu64 " refCount %i\n",
+	kprintf("%s at %" B_PRIu64 " length %" B_PRIu64 " refCount %i\n",
 		extentType, offset, length, refCount);
 }
 
@@ -147,11 +147,14 @@ CachedExtentTree::FillFreeExtents(uint64 lowerBound, uint64 upperBound)
 void
 CachedExtentTree::_RemoveExtent(CachedExtent* node)
 {
+	// if (onlyOne == true) {
 	node->refCount--;
 	if (node->refCount <= 0) {
 		Remove(node);
 		node->Delete();
 	}
+	// return;
+	// }
 }
 
 
@@ -221,7 +224,7 @@ CachedExtentTree::_AddFreeExtent(CachedExtent* node)
 {
 	if (node == NULL || node->IsAllocated() == true)
 		return B_BAD_VALUE;
-
+	kprintf("free offset %d size %d\n", node->offset, node->length);
 	CachedExtent* found = Find(node->offset);
 	if (found == NULL) {
 		Insert(node);
@@ -418,6 +421,7 @@ BlockGroup::Initialize(uint64 flag)
 		fKey.SetOffset(0);
 	}
 
+	TRACE("object id %llu offset %llu \n", fKey.ObjectID(), fKey.Offset());
 	if (status != B_OK)
 		ERROR("BlockGroup::Initialize() cannot find block group\n");
 
@@ -454,6 +458,8 @@ BlockGroup::LoadExtent(CachedExtentTree* tree, bool inverse)
 		status = iterator.GetNextEntry(&data);
 		key = iterator.Key();
 		if (status != B_OK) {
+			kprintf("id %d type %d offset %d start %d\n",
+				key.ObjectID(), key.Type(), key.Offset(), Start());
 			if (key.ObjectID() != Start())
 				break;
 			// When we couldn't find the item and key has

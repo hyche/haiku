@@ -474,6 +474,7 @@ create_dir(const char *path, bool createParents)
 	}
 
 	// make the directory
+	fprintf(stdout, "fssh create_dir() %d\n", (FSSH_S_IRWXU | FSSH_S_IRWXG | FSSH_S_IRWXO) & ~sUmask);
 	error = _kern_create_dir(-1,
 		path, (FSSH_S_IRWXU | FSSH_S_IRWXG | FSSH_S_IRWXO) & ~sUmask);
 	if (error != FSSH_B_OK) {
@@ -869,6 +870,7 @@ command_ls(int argc, const char* const* argv)
 
 			// open dir
 			int fd = _kern_open_dir(-1, file);
+			fprintf(stdout,"dir name: %s\n", file);
 			if (fd < 0) {
 				fprintf(stderr, "Error: Failed to open dir \"%s\": %s\n",
 					file, fssh_strerror(fd));

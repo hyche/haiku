@@ -27,6 +27,7 @@ BTree::Node::Node(Volume* volume)
 	fNode(NULL),
 	fVolume(volume),
 	fBlockNumber(0),
+	fEntrySize(0),
 	fWritable(false)
 {
 }
@@ -37,6 +38,7 @@ BTree::Node::Node(Volume* volume, off_t block)
 	fNode(NULL),
 	fVolume(volume),
 	fBlockNumber(0),
+	fEntrySize(0),
 	fWritable(false)
 {
 	SetTo(block);
@@ -66,16 +68,21 @@ BTree::Node::Unset()
 
 
 void
-BTree::Node::SetTo(off_t block)
+BTree::Node::SetTo(fsblock_t block)
 {
 	Unset();
 	fBlockNumber = block;
 	fNode = (btrfs_stream*)block_cache_get(fVolume->BlockCache(), block);
+
+	if (Level() != 0)
+		fEntrySize = sizeof(btrfs_index);
+	else
+		fEntrySize = sizeof(btrfs_entry);
 }
 
 
 void
-BTree::Node::SetToWritable(off_t block, int32 transactionId, bool empty)
+BTree::Node::SetToWritable(fsblock_t block, int32 transactionId, bool empty)
 {
 	Unset();
 	fBlockNumber = block;
@@ -87,6 +94,11 @@ BTree::Node::SetToWritable(off_t block, int32 transactionId, bool empty)
 		fNode = (btrfs_stream*)block_cache_get_writable(fVolume->BlockCache(),
 			block, transactionId);
 	}
+
+	if (Level() != 0)
+		fEntrySize = sizeof(btrfs_index);
+	else
+		fEntrySize = sizeof(btrfs_entry);
 }
 
 
@@ -107,7 +119,7 @@ BTree::Node::SearchSlot(const btrfs_key& key, int* slot, btree_traversing type)
 	const btrfs_key* other;
 	while (low < high) {
 		mid = (low + high) / 2;
-		other = (const btrfs_key*)(base + mid * entrySize);
+		other = (const btrfs_key*)(base + mid * fEntrySize);
 		comp = key.Compare(*other);
 		if (comp < 0)
 			high = mid;
@@ -135,6 +147,28 @@ BTree::Node::SearchSlot(const btrfs_key& key, int* slot, btree_traversing type)
 	TRACE("SearchSlot() found slot %" B_PRId32 " comp %" B_PRId32 "\n",
 		*slot, comp);
 	return B_OK;
+}
+
+
+void
+BTree::Node::CalculateChecksum(bool verify)
+{
+	uint32 hash = ~calculate_crc((uint32)~0, (uint8*)fNode + 32,
+		fVolume->BlockSize() - 32);
+	if (verify == true) {
+		//TODO:
+	}
+	fNode->header.SetChecksum(&hash);
+}
+
+
+void
+btrfs_header::SetChecksum(uint32* hash)
+{
+	for (int i = 0 ; i < BTRFS_CRC32C_SIZE; ++i) {
+		checksum[i] = *((uint8*)hash + i);
+	}
+	memset(checksum + BTRFS_CRC32C_SIZE, 0, 32 - BTRFS_CRC32C_SIZE);
 }
 
 
@@ -187,7 +221,7 @@ void
 BTree::Node::_Copy(const Node* origin, uint32 at, uint32 from, uint32 to,
 	int length) const
 {
-	TRACE("Node::_Copy() at: %d from: %d to: %d length: %d\n",
+	kprintf("Node::_Copy() at: %d from: %d to: %d length: %d\n",
 		at, from, to, length);
 
 	if (Level() == 0) {
@@ -195,8 +229,11 @@ BTree::Node::_Copy(const Node* origin, uint32 at, uint32 from, uint32 to,
 		// Item offset of copied node must be changed to get the
 		// item data offset correctly. length can be zero
 		// but let it there doesn't harm anything.
-		for (uint32 i = at; i - at <= to - from; ++i)
+		for (uint32 i = at; i - at <= to - from; ++i) {
 			Item(i)->SetOffset(Item(i)->Offset() - length);
+			kprintf("_Copy:: %i itemoffset %d itemsize %d\n", i,
+				Item(i)->Offset(), Item(i)->Size());
+		}
 
 		memcpy(ItemData(at + to - from), origin->ItemData(to),
 			origin->_CalculateSpace(from, to, 2));
@@ -204,6 +241,46 @@ BTree::Node::_Copy(const Node* origin, uint32 at, uint32 from, uint32 to,
 		memcpy(Index(at), origin->Index(from),
 			origin->_CalculateSpace(from, to));
 	}
+}
+
+
+status_t
+BTree::Node::Copy(const Node* origin, uint32* slots, uint32* length, int num)
+	const
+{
+	uint32 totalLength = 0;
+	for (int i = 0; i < num; ++i) {
+		if (length[i] == 0)		// this shouldn't be here
+			return B_BAD_VALUE;
+		totalLength = totalLength + length[i] + fEntrySize;
+	}
+
+	if (totalLength < 0 && -totalLength >= origin->SpaceUsed()
+		|| (totalLength > 0 && totalLength >= origin->SpaceLeft()))
+		return B_BAD_VALUE;
+
+	totalLength = 0;
+	TRACE("Node::Copy() num %d\n", num);
+	memcpy(fNode, origin->fNode, sizeof(btrfs_header));
+	if (slots[0] > 0)
+		_Copy(origin, 0, 0, slots[0] - 1, 0);
+
+	int positionChange = 0;
+	for (int i = 0; i < num; ++i) {
+		slots[i] += positionChange;
+		if (length[i] < 0) {
+			positionChange -= 1;
+			// _Copy(origin, slots[i], slots[i+1], length[i]);
+		} else {
+			positionChange += 1;
+			// _Copy(origin, slots[i], )
+		}
+
+	}
+
+	// if (slots[num - 1] + 1 < origin.ItemCount())
+		// _Copy(origin, slots[num - 1] + 1, origin.ItemCount() - 1, 0);
+	return B_OK;
 }
 
 
@@ -232,6 +309,7 @@ status_t
 BTree::Node::Copy(const Node* origin, uint32 start, uint32 end, int length)
 	const
 {
+	kprintf("length %d left %d used %d\n", length, SpaceLeft(), SpaceUsed());
 	status_t status = origin->_SpaceCheck(length);
 	if (status != B_OK)
 		return status;
@@ -282,7 +360,7 @@ BTree::Node::MoveEntries(uint32 start, uint32 end, int length) const
 	end++;
 	if (length < 0) {
 		// removing [start, end]
-		TRACE("Node::MoveEntries() removing ... start %" B_PRIu32 " end %"
+		kprintf("Node::MoveEntries() removing ... start %" B_PRIu32 " end %"
 			B_PRIu32 " length %i\n", start, end, length);
 		length += _CalculateSpace(start, end - 1);
 	} else {
@@ -312,6 +390,36 @@ BTree::Node::MoveEntries(uint32 start, uint32 end, int length) const
 	}
 
 	return B_OK;
+}
+
+
+void
+BTree::Node::Info() const
+{
+	kprintf("number of items %" B_PRIu32 " block number %" B_PRIu64 " owner %"
+		B_PRIu64 " logical address %" B_PRIu64 " generation %" B_PRIu64
+		" space used %i\n", ItemCount(), fBlockNumber, Owner(),
+		LogicalAddress(), Generation(), SpaceUsed());
+
+	uint8* node = (uint8*)fNode + sizeof(btrfs_header);
+	const btrfs_key* key;
+	const btrfs_entry* item;
+	const btrfs_index* index;
+
+	for (uint32 i = 0; i < ItemCount(); ++i) {
+		key = (const btrfs_key*)(node + i * fEntrySize);
+		kprintf("item %i: key ( %" B_PRIu64 " %" B_PRIu8 " %" B_PRIu64 " )", i,
+			key->ObjectID(), key->Type(), key->Offset());
+		if (Level() == 0) {
+			item = (const btrfs_entry*)key;
+			kprintf(" itemoffset %" B_PRIu32 " itemsize: %" B_PRIu32 "\n",
+				item->Offset(), item->Size());
+		} else {
+			index = (const btrfs_index*)key;
+			kprintf(" pointer address %" B_PRIu64 " generation %" B_PRIu64 "\n",
+				index->LogicalAddress(), index->Generation());
+		}
+	}
 }
 
 
@@ -425,6 +533,22 @@ BTree::Path::SetEntry(int slot, const btrfs_entry& entry, void* value)
 
 	memcpy(fNodes[0]->Item(slot), &entry, sizeof(btrfs_entry));
 	memcpy(fNodes[0]->ItemData(slot), value, entry.Size());
+	return B_OK;
+}
+
+
+status_t
+BTree::Path::SetEntry(int slot, const btrfs_key& key, void* value,
+	uint32 size, uint32 offset)
+{
+	Node* leaf = fNodes[0];
+	if (slot < 0)
+		return B_ENTRY_NOT_FOUND;
+
+	memcpy(leaf->Item(slot), &key, sizeof(btrfs_key));
+	leaf->Item(slot)->SetOffset(size);
+	leaf->Item(slot)->SetSize(offset);
+	memcpy(leaf->ItemData(slot), value, size);
 	return B_OK;
 }
 
@@ -797,9 +921,13 @@ BTree::RemoveEntries(Transaction& transaction, Path* path,
 	int length = -sizeof(btrfs_entry) * num;
 	for (int i = 0; i < num; i++) {
 		uint32 itemSize;
-		path->GetEntry(slot + i, NULL, &_data[i], &itemSize);
+		if (_data != NULL)
+			path->GetEntry(slot + i, NULL, &_data[i], &itemSize);
+		else
+			path->GetEntry(slot + i, NULL, NULL, &itemSize);
 		length -= itemSize;
 	}
+	TRACE("RemoveEntries() length %d\n", length);
 
 	status = path->InternalCopy(transaction, 1);
 	if (status != B_OK)
@@ -811,6 +939,18 @@ BTree::RemoveEntries(Transaction& transaction, Path* path,
 	}
 
 	return status;
+}
+
+
+status_t
+BTree::SwitchBranch(Path* path, Path** other, int level, int slot) const
+{
+	int currentSlot;
+	Node* node = path->GetNode(level, &currentSlot);
+	if (currentSlot == slot)
+		return B_OK;
+
+	return B_OK;
 }
 
 
@@ -893,7 +1033,47 @@ BTree::NextLeaf(Path* path) const
 }
 
 
-/* Set root infomation, to use this function root must be valid and
+/* Split a node at a specific level
+ */
+status_t
+BTree::BTree::SplitNode(Transaction& transaction, Path* path, int level)
+{
+	status_t status;
+	Node* node = path->GetNode(level);
+	if (node == NULL)
+		return B_BAD_VALUE;
+
+	int parentSlot;
+	Node* parent = path->GetNode(level + 1, &parentSlot);
+	if (parent == NULL) {
+		// split at root level
+		Node root(fVolume);
+		uint64 address;
+		uint64 physicalBlock;
+		status = fVolume->GetNewBlock(address, physicalBlock);
+		if (status != B_OK)
+			return status;
+
+		root.SetFSID(node->FSID());
+		root.SetLogicalAddress(address);
+		root.SetFlags(node->Flags());
+		root.SetChunkTreeUUID(node->ChunkTreeUUID());
+		root.SetGeneration(transaction.SystemID());
+		root.SetOwner(node->Owner());
+		root.SetItemCount(2);	// original and splitted node
+		root.SetLevel(level + 1);
+		root.SetToWritable(physicalBlock, transaction.ID(), true);
+		parentSlot = 0;
+		if ((parent = path->SetNode(&root, parentSlot)) == NULL)
+			return B_NO_MEMORY;
+	}
+
+
+	return B_OK;
+}
+
+
+/* Set root information, to use this function root must be valid and
  * exists on disk.
  */
 status_t
@@ -955,6 +1135,16 @@ TreeIterator::TreeIterator(BTree* tree, const btrfs_key& key)
 	fPath = new(std::nothrow) BTree::Path(tree);
 	if (fPath == NULL)
 		fIteratorStatus = B_NO_MEMORY;
+}
+
+
+TreeIterator::TreeIterator(BTree::Path* path, const btrfs_key& key)
+	:
+	fTree(path->Tree()),
+	fPath(path),
+	fKey(key),
+	fIteratorStatus(B_OK)
+{
 }
 
 

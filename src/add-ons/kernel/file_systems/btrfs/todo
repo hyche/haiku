@@ -1,0 +1,6 @@
+* Implement extent allocator, extent, journal, transaction, etc... oh mu god
+* Rework chunk (added chunk tree, or deleted bleh)
+* Implement DevExtent
+* combine chunk, devextent to mapping ?
+* Take a look at extent-io, extent-tree, extent-cache, free-space-tree, free-space-cache for reference to implement extent allocator.
+My life is end

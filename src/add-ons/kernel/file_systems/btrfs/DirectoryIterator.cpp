@@ -51,29 +51,32 @@ status_t
 DirectoryIterator::GetNext(char* name, size_t* _nameLength, ino_t* _id)
 {
 	if (fOffset == 0) {
-		if (*_nameLength < 3)
-			return B_BUFFER_OVERFLOW;
-		*_nameLength = 2;
-		strlcpy(name, "..", *_nameLength + 1);
-		*_id = fInode->ID();
-		fOffset = 1;
-		return B_OK;
-	} else if (fOffset == 1) {
 		if (*_nameLength < 2)
 			return B_BUFFER_OVERFLOW;
 		*_nameLength = 1;
 		strlcpy(name, ".", *_nameLength + 1);
+		*_id = fInode->ID();
+		fOffset = 1;
+		return B_OK;
+	} else if (fOffset == 1) {
+		if (*_nameLength < 3)
+			return B_BUFFER_OVERFLOW;
+		*_nameLength = 2;
+		strlcpy(name, "..", *_nameLength + 1);
 		fOffset = 2;
 		if (fInode->ID() == BTRFS_FIRST_SUBVOLUME) {
 			*_id = fInode->ID();
 			return B_OK;
 		}
-		return fInode->FindParent(_id);
+		//fInode->FindReference(NULL, _id);
+		//kprintf("inode id: %d refer id: %d\n", fInode->ID(), *_id);
+		return fInode->FindReference(NULL, _id);
 	}
 
 	btrfs_dir_entry* entries;
 	uint32 entries_length;
-	status_t status = fIterator->GetNextEntry((void**)&entries, &entries_length);
+	uint32 entries_offset;
+	status_t status = fIterator->GetNextEntry((void**)&entries, &entries_length, &entries_offset);
 	if (status != B_OK)
 		return status;
 
@@ -96,8 +99,10 @@ DirectoryIterator::GetNext(char* name, size_t* _nameLength, ino_t* _id)
 		return B_BUFFER_OVERFLOW;
 	}
 
-	memcpy(name, entry + 1, length);
+	memcpy(name, entry->name, length);
 	name[length] = '\0';
+	kprintf("NAME %s OFFSET %d LENGTH %d ID %d\n", entry->name,
+		entries_offset, entries_length, fIterator->Key().ObjectID());
 	*_nameLength = length;
 	*_id = entry->InodeID();
 	free(entries);
@@ -115,7 +120,7 @@ DirectoryIterator::Lookup(const char* name, size_t nameLength, ino_t* _id)
 			*_id = fInode->ID();
 			return B_OK;
 		}
-		return fInode->FindParent(_id);
+		return fInode->FindReference(NULL, _id);
 	}
 
 	uint32 hash = calculate_crc((uint32)~1, (uint8*)name, nameLength);

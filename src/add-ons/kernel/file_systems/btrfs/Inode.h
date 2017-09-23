@@ -68,8 +68,9 @@ public:
 			void*		FileCache() const { return fCache; }
 			void*		Map() const { return fMap; }
 
-			status_t	FindParent(ino_t* id);
 			uint64		FindNextIndex(BTree::Path* path) const;
+			status_t	FindReference(btrfs_inode_ref** _nodeRef,
+							ino_t* _parentID = NULL);
 	static	Inode*		Create(Transaction& transaction, ino_t id,
 							Inode* parent, int32 mode, uint64 size = 0,
 							uint64 flags = 0);
@@ -95,6 +96,7 @@ private:
 			void*		fMap;
 			status_t	fInitStatus;
 			btrfs_inode fNode;
+			int			fNumReferences;
 };
 
 

@@ -13,8 +13,9 @@
 typedef uint64 fileblock_t;		// file block number
 typedef uint64 fsblock_t;		// filesystem block number
 
-#define BTRFS_SUPER_BLOCK_OFFSET	0x10000
-#define BTRFS_NUM_ROOT_BACKUPS				4
+#define BTRFS_SUPER_BLOCK_OFFSET		0x10000
+#define BTRFS_NUM_ROOT_BACKUPS			4
+#define BTRFS_CRC32C_SIZE				4
 
 
 struct btrfs_backup_roots {
@@ -112,10 +113,17 @@ struct btrfs_header {
 		{ return B_LENDIAN_TO_HOST_INT32(item_count); }
 	uint8 Level() const { return level; }
 
+	void SetChecksum(uint32* hash);	// implemented in BTree.cpp
+	void SetFSID(uint8* id)
+		{ memcpy(fsid, id, 16); }
 	void SetLogicalAddress(uint64 logical)
 		{ logical_address = B_HOST_TO_LENDIAN_INT64(logical); }
+	void SetFlags(uint64 flags) { flags = B_HOST_TO_LENDIAN_INT64(flags); }
+	void SetChunkTreeUUID(uint8* uuid)
+		{ memcpy(chunk_tree_uuid, uuid, 16); }
 	void SetGeneration(uint64 gen)
 		{ generation = B_HOST_TO_LENDIAN_INT64(gen); }
+	void SetOwner(uint64 id) { owner = B_HOST_TO_LENDIAN_INT64(id); }
 	void SetItemCount(uint32 itemCount)
 		{ item_count = B_HOST_TO_LENDIAN_INT32(itemCount); }
 } _PACKED;
@@ -192,6 +200,20 @@ struct btrfs_chunk {
 		{ return B_LENDIAN_TO_HOST_INT16(stripe_count); }
 	uint16 SubStripes() const
 		{ return B_LENDIAN_TO_HOST_INT16(sub_stripes); }
+} _PACKED;
+
+
+struct btrfs_dev_extent {
+	uint64	chunk_tree_id;
+	uint64	chunk_object_id;
+	uint64	chunk_offset;
+	uint64	length;
+	uint8	chunk_tree_uuid[16];
+
+	uint64 ChunkOffset() const
+		{ return B_LENDIAN_TO_HOST_INT64(chunk_offset); }
+	uint64	Length() const
+		{ return B_LENDIAN_TO_HOST_INT64(length); }
 } _PACKED;
 
 
@@ -457,6 +479,11 @@ struct btrfs_extent_data_ref {
 } _PACKED;
 
 
+struct btrfs_metada {
+	btrfs_extent extent_item;
+} _PACKED;
+
+
 #define BTRFS_SUPER_BLOCK_MAGIC				"_BHRfS_M"
 #define BTRFS_FIRST_SUBVOLUME				256
 
@@ -481,7 +508,9 @@ struct btrfs_extent_data_ref {
 #define BTRFS_KEY_TYPE_METADATA_ITEM		169
 #define BTRFS_KEY_TYPE_EXTENT_DATA_REF		178
 #define BTRFS_KEY_TYPE_BLOCKGROUP_ITEM		192
+#define BTRFS_KEY_TYPE_DEVICE_EXTENT		204
 #define BTRFS_KEY_TYPE_CHUNK_ITEM			228
+#define BTRFS_KEY_TYPE_PERSISTENT_ITEM		249
 
 #define BTRFS_EXTENT_COMPRESS_NONE			0
 #define BTRFS_EXTENT_COMPRESS_ZLIB			1
@@ -492,6 +521,7 @@ struct btrfs_extent_data_ref {
 #define BTRFS_EXTENT_FLAG_DATA				1
 #define BTRFS_EXTENT_FLAG_TREE_BLOCK		2
 #define BTRFS_EXTENT_FLAG_ALLOCATED			4
+#define BTRFS_EXTENT_FLAG_MASK				7
 
 #define BTRFS_BLOCKGROUP_FLAG_DATA			1
 #define BTRFS_BLOCKGROUP_FLAG_SYSTEM		2

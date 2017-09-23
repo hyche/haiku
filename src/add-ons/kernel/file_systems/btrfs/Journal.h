@@ -23,9 +23,12 @@ public:
 								{ return fCurrentGeneration; }
 			int32			TransactionID() const { return fTransactionID; }
 			status_t		Lock(Transaction* owner);
+								//bool separateSubTransactions);
 			status_t		UnLock(Transaction* owner, bool success);
 
 private:
+	static	void			_TransactionEnded(int32 transactionID, int32 event,
+								void* _journal);
 	static	void			_TransactionWritten(int32 transactionID, int32 event,
 								void* _journal);
 			status_t		_TransactionDone(bool success);
@@ -34,8 +37,11 @@ private:
 			Volume*			fVolume;
 			recursive_lock	fLock;
 			Transaction*	fOwner;
+			//int32			fUnwrittenTransactions;
 			int32			fTransactionID;
 			uint64			fCurrentGeneration;
+			//bool			fHasSubTransaction;
+			//bool			fSeparateSubTransactions;
 };
 
 
@@ -49,13 +55,17 @@ public:
 			uint64			SystemID() const
 								{ return fJournal->SystemTransactionID(); }
 			bool			HasBlock(fsblock_t blockNumber) const;
+			void			InsertBlock(fsblock_t blockNumber);
+
 			Transaction*	Parent() const { return fParent; }
 			void			SetParent(Transaction* parent) { fParent = parent; }
 			status_t		Start(Volume* volume);
 			status_t		Done();
 private:
 			Journal*		fJournal;
+			//TransactionListerners	fListeners;
 			Transaction*	fParent;
+			//std::unordered_set<fsblock_t> fBlocksTable;
 };
 
 

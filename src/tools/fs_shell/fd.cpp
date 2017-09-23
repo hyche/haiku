@@ -8,6 +8,7 @@
 #include "fd.h"
 
 #include <stdlib.h>
+#include <stdio.h>
 
 #include "fssh_atomic.h"
 #include "fssh_fcntl.h"
@@ -468,6 +469,7 @@ common_close(int fd, bool kernel)
 fssh_ssize_t
 _kern_read(int fd, fssh_off_t pos, void *buffer, fssh_size_t length)
 {
+	printf("_kern_read\n");
 	struct file_descriptor *descriptor;
 	fssh_ssize_t bytesRead;
 

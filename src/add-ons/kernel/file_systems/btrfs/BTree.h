@@ -9,7 +9,6 @@
 
 
 #include "btrfs.h"
-#include "Volume.h"
 
 
 #define BTREE_NULL			-1LL
@@ -28,6 +27,7 @@ enum btree_traversing {
 };
 
 
+class Volume;
 class Transaction;
 
 
@@ -71,8 +71,12 @@ public:
 			status_t			Traverse(btree_traversing type, Path* path,
 									const btrfs_key& key) const;
 
+			status_t			SwitchBranch(Path* path, Path** other,
+									int level, int slot) const;
 			status_t			PreviousLeaf(Path* path) const;
 			status_t			NextLeaf(Path* path) const;
+			status_t			SplitNode(Transaction& transaction,
+									Path* path, int level);
 			status_t			MakeEntries(Transaction& transaction,
 									Path* path, const btrfs_key& startKey,
 									int num, int length);
@@ -119,49 +123,50 @@ public:
 		~Node();
 
 			// just return from Header
-		uint64	LogicalAddress() const
-			{ return fNode->header.LogicalAddress(); }
-		uint64	Flags() const
-			{ return fNode->header.Flags(); }
-		uint64	Generation() const
-			{ return fNode->header.Generation(); }
-		uint64	Owner() const
-			{ return fNode->header.Owner(); }
-		uint32	ItemCount() const
-			{ return fNode->header.ItemCount(); }
-		uint8	Level() const
-			{ return fNode->header.Level(); }
-		void	SetLogicalAddress(uint64 address)
-			{ fNode->header.SetLogicalAddress(address); }
-		void	SetGeneration(uint64 generation)
-			{ fNode->header.SetGeneration(generation); }
-		void	SetItemCount(uint32 itemCount)
-			{ fNode->header.SetItemCount(itemCount); }
+		uint8*	FSID() const;
+		uint64	LogicalAddress() const;
+		uint64	Flags() const;
+		uint8*	ChunkTreeUUID() const;
+		uint64	Generation() const;
+		uint64	Owner() const;
+		uint32	ItemCount() const;
+		uint8	Level() const;
+		void	SetFSID(uint8* fsid);
+		void	SetLogicalAddress(uint64 logicalAddress);
+		void	SetFlags(uint64 flags);
+		void	SetChunkTreeUUID(uint8* uuid);
+		void	SetGeneration(uint64 generation);
+		void	SetOwner(uint64 owner);
+		void	SetItemCount(uint32 itemCount);
+		void	SetLevel(uint8 level);
 
-		btrfs_index*	Index(uint32 i) const
-			{ return &fNode->index[i]; }
+		btrfs_index*	Index(int i) const;
 
-		btrfs_entry*	Item(uint32 i) const
-			{ return &fNode->entries[i]; }
-		uint8*	ItemData(uint32 i) const
-			{ return (uint8*)Item(0) + Item(i)->Offset(); }
+		btrfs_entry*	Item(int i) const;
+		uint8*	ItemData(int i) const;
 
 		void	Keep();
 		void	Unset();
 
-		void	SetTo(off_t block);
-		void	SetToWritable(off_t block, int32 transactionId, bool empty);
+		void	SetTo(fsblock_t block);
+		void	SetToWritable(fsblock_t block, int32 transactionId, bool empty);
+
+		fsblock_t	BlockNum() const;
+		bool	IsWritable() const;
+
+		void	CalculateChecksum(bool verify = false);
 		int		SpaceUsed() const;
 		int		SpaceLeft() const;
 
-		off_t	BlockNum() const { return fBlockNumber;}
-		bool	IsWritable() const { return fWritable; }
+		status_t	Copy(const Node* origin, uint32* slots, uint32* length,
+						int num) const;
 		status_t	Copy(const Node* origin, uint32 start, uint32 end,
 						int length) const;
 		status_t	MoveEntries(uint32 start, uint32 end, int length) const;
 
 		status_t	SearchSlot(const btrfs_key& key, int* slot,
 						btree_traversing type) const;
+		void	Info() const;
 	private:
 		Node(const Node&);
 		Node& operator=(const Node&);
@@ -174,7 +179,8 @@ public:
 
 		btrfs_stream*		fNode;
 		Volume*				fVolume;
-		off_t				fBlockNumber;
+		fsblock_t			fBlockNumber;
+		int					fEntrySize;
 		bool				fWritable;
 	};
 
@@ -191,6 +197,10 @@ public:
 						uint32* _size = NULL, uint32* _offset = NULL);
 		status_t	GetEntry(int slot, btrfs_key* _key, void** _value,
 						uint32* _size = NULL, uint32* _offset = NULL);
+		status_t	SetCurrentEntry(const btrfs_key& key, void* value,
+						uint32 size, uint32 offset);
+		status_t	SetEntry(int slot, const btrfs_key& key, void* value,
+						uint32 size, uint32 offset);
 		status_t	SetEntry(int slot, const btrfs_entry& entry, void* value);
 
 		int			Move(int level, int step);
@@ -215,6 +225,8 @@ public:
 class TreeIterator : public SinglyLinkedListLinkImpl<TreeIterator> {
 public:
 								TreeIterator(BTree* tree, const btrfs_key& key);
+								TreeIterator(BTree::Path* path,
+									const btrfs_key& key);
 								~TreeIterator();
 
 			void				Rewind(bool inverse = false);
@@ -248,6 +260,156 @@ private:
 };
 
 
+//	#pragma mark - BTree::Node inline functions
+
+
+inline uint8*
+BTree::Node::FSID() const
+{
+	return fNode->header.fsid;
+}
+
+
+inline uint64
+BTree::Node::LogicalAddress() const
+{
+	return fNode->header.LogicalAddress();
+}
+
+
+inline uint64
+BTree::Node::Flags() const
+{
+	return fNode->header.Flags();
+}
+
+
+inline uint8*
+BTree::Node::ChunkTreeUUID() const
+{
+	return fNode->header.chunk_tree_uuid;
+}
+
+
+inline uint64
+BTree::Node::Generation() const
+{
+	return fNode->header.Generation();
+}
+
+
+inline uint64
+BTree::Node::Owner() const
+{
+	return fNode->header.Owner();
+}
+
+
+inline uint32
+BTree::Node::ItemCount() const
+{
+	return fNode->header.ItemCount();
+}
+
+
+inline uint8
+BTree::Node::Level() const
+{
+	return fNode->header.Level();
+}
+
+
+inline void
+BTree::Node::SetFSID(uint8* fsid)
+{
+	fNode->header.SetFSID(fsid);
+}
+
+
+inline void
+BTree::Node::SetLogicalAddress(uint64 logicalAddress)
+{
+	fNode->header.SetLogicalAddress(logicalAddress);
+}
+
+
+inline void
+BTree::Node::SetFlags(uint64 flags)
+{
+	fNode->header.SetFlags(flags);
+}
+
+
+inline void
+BTree::Node::SetChunkTreeUUID(uint8* uuid)
+{
+	fNode->header.SetChunkTreeUUID(uuid);
+}
+
+
+inline void
+BTree::Node::SetGeneration(uint64 generation)
+{
+	fNode->header.SetGeneration(generation);
+}
+
+
+inline void
+BTree::Node::SetOwner(uint64 owner)
+{
+	fNode->header.SetOwner(owner);
+}
+
+
+inline void
+BTree::Node::SetItemCount(uint32 itemCount)
+{
+	fNode->header.SetItemCount(itemCount);
+}
+
+
+inline void
+BTree::Node::SetLevel(uint8 level)
+{
+	fNode->header.level = level;
+}
+
+
+inline btrfs_index*
+BTree::Node::Index(int i) const
+{
+	return &fNode->index[i];
+}
+
+
+inline btrfs_entry*
+BTree::Node::Item(int i) const
+{
+	return &fNode->entries[i];
+}
+
+
+inline uint8*
+BTree::Node::ItemData(int i) const
+{
+	return (uint8*)Item(0) + Item(i)->Offset();
+}
+
+
+inline fsblock_t
+BTree::Node::BlockNum() const
+{
+	return fBlockNumber;
+}
+
+
+inline bool
+BTree::Node::IsWritable() const
+{
+	return fWritable;
+}
+
+
 //	#pragma mark - BTree::Path inline functions
 
 
@@ -256,6 +418,14 @@ BTree::Path::GetCurrentEntry(btrfs_key* _key, void** _value, uint32* _size,
 	uint32* _offset)
 {
 	return GetEntry(fSlots[0], _key, _value, _size, _offset);
+}
+
+
+inline status_t
+BTree::Path::SetCurrentEntry(const btrfs_key& key, void* value, uint32 size,
+	uint32 offset)
+{
+	return SetEntry(fSlots[0], key, value, size, offset);
 }
 
 

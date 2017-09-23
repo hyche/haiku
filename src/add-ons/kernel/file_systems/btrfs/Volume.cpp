@@ -10,7 +10,6 @@
 
 
 #include "Volume.h"
-#include "BTree.h"
 #include "CachedBlock.h"
 #include "Chunk.h"
 #include "Inode.h"
@@ -257,7 +256,7 @@ Volume::Mount(const char* deviceName, uint32 flags)
 
 	if (opener.IsReadOnly())
 		fFlags |= VOLUME_READ_ONLY;
-
+	kprintf("flags:%i\n", fFlags);
 	// read the superblock
 	status_t status = Identify(fDevice, &fSuperBlock);
 	if (status != B_OK) {
@@ -269,6 +268,14 @@ Volume::Mount(const char* deviceName, uint32 flags)
 	fSectorSize = fSuperBlock.SectorSize();
 	TRACE("block size %" B_PRIu32 "\n", fBlockSize);
 	TRACE("sector size %" B_PRIu32 "\n", fSectorSize);
+	//find oldest roots backup index
+	fOldestBackup = 0;
+	for (int i = 1; i < BTRFS_NUM_ROOT_BACKUPS; i++) {
+		if (fSuperBlock.backup_roots[fOldestBackup].RootGen()
+			> fSuperBlock.backup_roots[i].RootGen())
+			fOldestBackup = i;
+	}
+	TRACE("oldest backup index %i\n", fOldestBackup);
 
 	uint8* start = (uint8*)&fSuperBlock.system_chunk_array[0];
 	uint8* end = (uint8*)&fSuperBlock.system_chunk_array[2048];

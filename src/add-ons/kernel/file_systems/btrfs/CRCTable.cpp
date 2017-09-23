@@ -66,4 +66,3 @@ calculate_crc(uint32 crc, uint8* data, uint16 length)
 	}
 	return crc;
 }
-

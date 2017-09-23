@@ -11,7 +11,10 @@
 #include "btrfs.h"
 #include "DirectoryIterator.h"
 #include "Inode.h"
+#include "ExtentAllocator.h"
+#include "Journal.h"
 #include "Utility.h"
+#include "CRCTable.h"
 
 
 //#define TRACE_BTRFS
@@ -105,6 +108,7 @@ btrfs_mount(fs_volume* _volume, const char* device, uint32 flags,
 	const char* args, ino_t* _rootID)
 {
 	Volume* volume = new(std::nothrow) Volume(_volume);
+	kprintf("btrfs_mount() flags: %i volume: %p\n", flags, volume);
 	if (volume == NULL)
 		return B_NO_MEMORY;
 
@@ -142,6 +146,7 @@ btrfs_unmount(fs_volume* _volume)
 static status_t
 btrfs_read_fs_info(fs_volume* _volume, struct fs_info* info)
 {
+	kprintf("read_fs_info()\n");
 	Volume* volume = (Volume*)_volume->private_volume;
 
 	// File system flags
@@ -169,6 +174,7 @@ static status_t
 btrfs_get_vnode(fs_volume* _volume, ino_t id, fs_vnode* _node, int* _type,
 	uint32* _flags, bool reenter)
 {
+	 kprintf("btrfs_get_vnode addr: %p id: %i type:%i\n", _node, id, *_type);
 	Volume* volume = (Volume*)_volume->private_volume;
 
 	Inode* inode = new(std::nothrow) Inode(volume, id);
@@ -222,6 +228,8 @@ btrfs_read_pages(fs_volume* _volume, fs_vnode* _node, void* _cookie,
 	size_t vecOffset = 0;
 	size_t bytesLeft = *_numBytes;
 	status_t status;
+	kprintf("btrfs_read_pages(): inode info id: %i, pos: %i, length:%i\n",
+		inode->ID(), pos, *_numBytes);
 
 	while (true) {
 		file_io_vec fileVecs[8];
@@ -283,6 +291,7 @@ btrfs_get_file_map(fs_volume* _volume, fs_vnode* _node, off_t offset,
 	size_t size, struct file_io_vec* vecs, size_t* _count)
 {
 	TRACE("btrfs_get_file_map()\n");
+	//kprintf("btrfs_get_file_map() offset: %d size: %d count: %d\n", offset, size, *_count);
 	Inode* inode = (Inode*)_node->private_node;
 	size_t index = 0, max = *_count;
 
@@ -334,6 +343,8 @@ btrfs_lookup(fs_volume* _volume, fs_vnode* _directory, const char* name,
 	TRACE("btrfs_lookup: name address: %p (%s)\n", name, name);
 	Volume* volume = (Volume*)_volume->private_volume;
 	Inode* directory = (Inode*)_directory->private_node;
+	kprintf("btrfs_lookup for name: %s in parent id:%i\n", name,
+		directory->ID());
 
 	// check access permissions
 	status_t status = directory->CheckPermissions(X_OK);
@@ -362,6 +373,7 @@ btrfs_ioctl(fs_volume* _volume, fs_vnode* _node, void* _cookie, uint32 cmd,
 static status_t
 btrfs_read_stat(fs_volume* _volume, fs_vnode* _node, struct stat* stat)
 {
+	kprintf("read_stat()\n");
 	Inode* inode = (Inode*)_node->private_node;
 
 	stat->st_dev = inode->GetVolume()->ID();
@@ -391,6 +403,7 @@ btrfs_open(fs_volume* /*_volume*/, fs_vnode* _node, int openMode,
 	void** _cookie)
 {
 	Inode* inode = (Inode*)_node->private_node;
+	kprintf("btrfs_open mode:%i\n", openMode);
 
 	// opening a directory read-only is allowed, although you can't read
 	// any data from it.
@@ -430,12 +443,30 @@ static status_t
 btrfs_read(fs_volume* _volume, fs_vnode* _node, void* _cookie, off_t pos,
 	void* buffer, size_t* _length)
 {
+	Volume* volume = (Volume*)_volume->private_volume;
 	Inode* inode = (Inode*)_node->private_node;
+	kprintf("btrfs_read volume: %p inode id: %i \n", _volume, inode->ID());
 
 	if (!inode->IsFile()) {
 		*_length = 0;
 		return inode->IsDirectory() ? B_IS_A_DIRECTORY : B_BAD_VALUE;
 	}
+
+	//fsblock_t chosen = 2324;
+	fsblock_t chosen = 0;
+	BTree::Node node(volume);
+
+	node.SetToWritable(chosen, -1, false);
+	node.SetFlags(100);
+	block_cache_sync(volume->BlockCache());
+	/*
+	ExtentAllocator* ea = volume->GetAllocator();
+	uint64 found;
+	status_t status = ea->AllocateDataBlock(found, volume->SectorSize());
+
+	if (status != B_OK)
+		kprintf("9999999\n");
+		*/
 
 	return inode->ReadAt(pos, (uint8*)buffer, _length);
 }
@@ -451,6 +482,7 @@ btrfs_close(fs_volume* _volume, fs_vnode* _node, void* _cookie)
 static status_t
 btrfs_free_cookie(fs_volume* _volume, fs_vnode* _node, void* _cookie)
 {
+	kprintf("btrfs_free_cookie()\n");
 	file_cookie* cookie = (file_cookie*)_cookie;
 	Volume* volume = (Volume*)_volume->private_volume;
 	Inode* inode = (Inode*)_node->private_node;
@@ -467,6 +499,7 @@ static status_t
 btrfs_access(fs_volume* _volume, fs_vnode* _node, int accessMode)
 {
 	Inode* inode = (Inode*)_node->private_node;
+	kprintf("btrfs_access: mode %i node id:%i\n", accessMode, inode->ID());
 	return inode->CheckPermissions(accessMode);
 }
 
@@ -475,6 +508,7 @@ static status_t
 btrfs_read_link(fs_volume* _volume, fs_vnode* _node, char* buffer,
 	size_t* _bufferSize)
 {
+	kprintf("btrfs_read_link()\n");
 	Inode* inode = (Inode*)_node->private_node;
 	return inode->ReadAt(0, (uint8*)buffer, _bufferSize);
 }
@@ -525,6 +559,7 @@ btrfs_create_dir(fs_volume* _volume, fs_vnode* _directory, const char* name,
 	else
 		entry_cache_remove(volume->ID(), directory->ID(), name);
 
+	path.GetNode(0)->Info();
 	return status;
 }
 
@@ -567,6 +602,7 @@ btrfs_remove_dir(fs_volume* _volume, fs_vnode* _directory, const char* name)
 		entry_cache_add(volume->ID(), id, "..", id);
 	}
 
+	path.GetNode(0)->Info();
 	return status;
 }
 
@@ -574,6 +610,7 @@ btrfs_remove_dir(fs_volume* _volume, fs_vnode* _directory, const char* name)
 static status_t
 btrfs_open_dir(fs_volume* /*_volume*/, fs_vnode* _node, void** _cookie)
 {
+	kprintf("btrfs_open_dir\n");
 	Inode* inode = (Inode*)_node->private_node;
 	status_t status = inode->CheckPermissions(R_OK);
 	if (status < B_OK)
@@ -597,6 +634,9 @@ static status_t
 btrfs_read_dir(fs_volume* _volume, fs_vnode* _node, void* _cookie,
 	struct dirent* dirent, size_t bufferSize, uint32* _num)
 {
+	Inode* inode = (Inode*)_node->private_node;
+	kprintf("btrfs_read_dir: _num: %i id %d bufferSize %d\n",
+		*_num, inode->ID(), bufferSize);
 	DirectoryIterator* iterator = (DirectoryIterator*)_cookie;
 	Volume* volume = (Volume*)_volume->private_volume;
 
@@ -607,8 +647,8 @@ btrfs_read_dir(fs_volume* _volume, fs_vnode* _node, void* _cookie,
 		ino_t id;
 		size_t length = bufferSize - sizeof(struct dirent) + 1;
 
-		status_t status = iterator->GetNext(dirent->d_name, &length,
-			&id);
+		status_t status = iterator->GetNext(dirent->d_name, &length, &id);
+		kprintf("btrfs_read_dir: dir entry id %d\n", id);
 
 		if (status == B_ENTRY_NOT_FOUND)
 			break;
@@ -640,6 +680,7 @@ btrfs_read_dir(fs_volume* _volume, fs_vnode* _node, void* _cookie,
 static status_t
 btrfs_rewind_dir(fs_volume* /*_volume*/, fs_vnode* /*node*/, void* _cookie)
 {
+	//kprintf("btrfs_rewind_dir:\n");
 	DirectoryIterator* iterator = (DirectoryIterator*)_cookie;
 
 	return iterator->Rewind();
@@ -649,6 +690,7 @@ btrfs_rewind_dir(fs_volume* /*_volume*/, fs_vnode* /*node*/, void* _cookie)
 static status_t
 btrfs_close_dir(fs_volume * /*_volume*/, fs_vnode * /*node*/, void * /*_cookie*/)
 {
+	kprintf("btrfs_close_dir:\n");
 	return B_OK;
 }
 

@@ -116,6 +116,7 @@ CachedBlock::SetToWritable(off_t block, int32 transactionId, bool empty)
 	fBlockNumber = block;
 	fWritable = true;
 	if (empty) {
+		kprintf("CachedBlock set to writable %p\n", fVolume->BlockCache());
 		fBlock = (uint8*)block_cache_get_empty(fVolume->BlockCache(),
 			block, transactionId);
 	} else {
