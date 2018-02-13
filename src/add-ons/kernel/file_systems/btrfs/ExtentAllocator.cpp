@@ -82,15 +82,14 @@ CachedExtentTree::~CachedExtentTree()
 }
 
 
-/* Find extent that cover or after "offset" and has length >= "size"
+/* Find extent that cover or after "offset"
  * it must also satisfy the condition "type".
  */
 status_t
-CachedExtentTree::FindNext(CachedExtent** chosen, uint64 offset, uint64 size,
-	uint64 type)
+CachedExtentTree::FindNext(CachedExtent** chosen, uint64 offset, uint64 type)
 {
 	CachedExtent* found = Find(offset);
-	while (found != NULL && (found->flags != type || found->length < size))
+	while (found != NULL && found->flags != type)
 		found = Next(found);
 
 	if (found == NULL)
@@ -615,7 +614,7 @@ ExtentAllocator::_Allocate(uint64& found, uint64 start, uint64 size,
 	CachedExtent* chosen;
 	status_t status;
 	while(true) {
-		status = fTree->FindNext(&chosen, start, size, type);
+		status = fTree->FindNext(&chosen, start, type);
 		if (status != B_OK)
 			return status;
 

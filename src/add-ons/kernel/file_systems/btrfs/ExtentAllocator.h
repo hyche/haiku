@@ -82,7 +82,7 @@ public:
 								~CachedExtentTree();
 
 			status_t			FindNext(CachedExtent** chosen, uint64 offset,
-									uint64 size, uint64 type);
+									uint64 type);
 			status_t			AddExtent(CachedExtent* extent);
 			status_t			FillFreeExtents(uint64 lowerBound,
 									uint64 upperBound);

@@ -539,7 +539,7 @@ Volume::FindBlock(off_t logical, off_t& physical)
 	free(chunk);
 	status = _chunk.FindBlock(logical, physical);
 	if (status != B_OK)
-			return status;
+		return status;
 	TRACE("Volume::FindBlock(): logical: %" B_PRIdOFF ", physical: %" B_PRIdOFF
 		"\n", logical, physical);
 	return B_OK;
